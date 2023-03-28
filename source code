@@ -1,0 +1,70 @@
+#Download images of birds and non-birds
+
+
+
+
+urls = search_images('bird photos', max_images=1)
+urls[0]
+from fastdownload import download_url
+dest = 'bird.jpg'
+download_url(urls[0], dest, show_progress=False)
+
+
+
+from fastai.vision.all import *
+im = Image.open(dest)
+im.to_thumb(256,256)
+download_url(search_images('forest photos', max_images=1)[0], 'forest.jpg', show_progress=False)
+Image.open('forest.jpg').to_thumb(256,256)
+#Our searches seem to be giving reasonable results, so let's grab a few examples of each of "bird" and "forest" photos, and save each group of photos to a different folder.
+searches = 'forest','bird'
+path = Path('bird_or_not')
+from time import sleep
+
+
+
+for o in searches:
+    dest = (path/o)
+    dest.mkdir(exist_ok=True, parents=True)
+    download_images(dest, urls=search_images(f'{o} photo'))
+    sleep(10)  # Pause between searches to avoid over-loading server
+    download_images(dest, urls=search_images(f'{o} sun photo'))
+    sleep(10)
+    download_images(dest, urls=search_images(f'{o} shade photo'))
+    sleep(10)
+    resize_images(path/o, max_size=400, dest=path/o)
+    
+    
+    
+#training Model
+
+
+# failed photos
+
+
+failed = verify_images(get_image_files(path))
+failed.map(Path.unlink)
+len(failed)
+
+
+
+
+#dataloaders and validation set
+
+
+
+dls = DataBlock(
+    blocks=(ImageBlock, CategoryBlock), 
+    get_items=get_image_files, 
+    splitter=RandomSplitter(valid_pct=0.2, seed=42),
+    get_y=parent_label,
+    item_tfms=[Resize(192, method='squish')]
+).dataloaders(path, bs=32)
+
+
+
+dls.show_batch(max_n=6)
+#building model
+is_bird,_,probs = learn.predict(PILImage.create('bird.jpg'))
+print(f"This is a: {is_bird}.")
+print(f"Probability it's a bird: {probs[0]:.4f}")
